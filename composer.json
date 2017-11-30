@@ -1,0 +1,12 @@
+{
+    "name": "maxgaurav/aws-snapshots",
+    "description": "manage aws snapshots",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "aws/aws-sdk-php": "^3.39",
+        "tightenco/collect": "^5.5",
+        "nesbot/carbon": "^1.22",
+        "vlucas/phpdotenv": "^2.4"
+    }
+}

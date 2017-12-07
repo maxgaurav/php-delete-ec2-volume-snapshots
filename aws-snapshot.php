@@ -54,17 +54,32 @@ $maxDate->setTime(0,0,0);
  */
 $lastWednesdayFromMaxDate = $maxDate->copy()->subDays(7);
 $lastWednesdayFromMaxDate = $lastWednesdayFromMaxDate->addDays(\Carbon\Carbon::WEDNESDAY - $lastWednesdayFromMaxDate->dayOfWeek);
+$previous3Wednesdays = [
+    $lastWednesdayFromMaxDate->copy()->subDays(7),
+    $lastWednesdayFromMaxDate->copy()->subDays(14),
+    $lastWednesdayFromMaxDate->copy()->subDays(28),
+];
 
 /**
  * Filtering out the latest and last weeks wednesday snapshots from the list
  */
-$toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate, $lastWednesdayFromMaxDate) {
+$toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate, $lastWednesdayFromMaxDate, $previous3Wednesdays) {
     /**
      * @var \Carbon\Carbon $startTime
      */
     $startTime = $snapshot['StartTime'];
     $startTime->setTime(0,0,0);
-    return $startTime->notEqualTo($maxDate) && $startTime->notEqualTo($lastWednesdayFromMaxDate);
+
+    if($startTime->eq($maxDate) || $startTime->eq($lastWednesdayFromMaxDate)){
+        return false;
+    }
+
+    foreach ($previous3Wednesdays as $previous3Wednesday) {
+        if($startTime->eq($previous3Wednesday)){
+            return false;
+        }
+    }
+    return true;
 });
 
 

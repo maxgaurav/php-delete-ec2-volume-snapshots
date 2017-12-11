@@ -55,9 +55,10 @@ $maxDate->setTime(0,0,0);
 $lastWednesdayFromMaxDate = $maxDate->copy()->subDays(7);
 $lastWednesdayFromMaxDate = $lastWednesdayFromMaxDate->addDays(\Carbon\Carbon::WEDNESDAY - $lastWednesdayFromMaxDate->dayOfWeek);
 $previous3Wednesdays = [
+    $lastWednesdayFromMaxDate,
     $lastWednesdayFromMaxDate->copy()->subDays(7),
     $lastWednesdayFromMaxDate->copy()->subDays(14),
-    $lastWednesdayFromMaxDate->copy()->subDays(28),
+    $lastWednesdayFromMaxDate->copy()->subDays(21),
 ];
 
 /**
@@ -70,7 +71,7 @@ $toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate, $las
     $startTime = $snapshot['StartTime'];
     $startTime->setTime(0,0,0);
 
-    if($startTime->eq($maxDate) || $startTime->eq($lastWednesdayFromMaxDate)){
+    if($startTime->eq($maxDate)){
         return false;
     }
 

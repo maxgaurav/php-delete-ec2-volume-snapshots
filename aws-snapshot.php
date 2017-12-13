@@ -89,10 +89,10 @@ $toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate, $las
  *
  */
 $toDeleteSnapshots->each(function($snapshot) use($aws){
-    $aws->deleteSnapshot([
-        'DryRun' => getenv('DRY_RUN'),
-        'SnapshotId' => $snapshot['SnapshotId']
-    ]);
+   $aws->deleteSnapshot([
+       'DryRun' => getenv('DRY_RUN') == true ?: false,
+       'SnapshotId' => $snapshot['SnapshotId']
+   ]);
 });
 
 

@@ -24,105 +24,90 @@ $aws = new Aws\Ec2\Ec2Client([
     'version' => getenv('AWS_EC2_CLIENT_VERSION'), //version
 ]);
 
-try {
+foreach (explode(',', getenv('VOLUME_ID')) as $volumeId){
+    $logger->info('Working for volume ' . $volumeId);
 
-    /**
-     * Fetching all the snapshots for the given volume
-     */
-    $result = $aws->describeSnapshots([
-        'Filters' => [
-            [
-                'Name' => 'status',
-                'Values' => ['completed']
-            ], [
-                'Name' => 'volume-id',
-                'Values' => [getenv('VOLUME_ID')]
-            ]
-        ]
-    ]);
+    try {
 
-
-    /**
-     * Converting the StartTime of all snapshots to Carbon DateTime instances
-     */
-    $snapshots = collect($result->get('Snapshots'))->transform(function ($snapshot) {
-        $snapshot['StartTime'] = \Carbon\Carbon::parse($snapshot['StartTime']);
-        return $snapshot;
-    });
-
-    /**
-     * The timestamp of newest snapshot created
-     *
-     * @var \Carbon\Carbon $maxDate
-     */
-    $maxDate = $snapshots->max('StartTime');
-    $maxDate->setTime(0, 0, 0);
-
-    /**
-     * Finding out the date of wednesday of last week from current date
-     */
-    if ($maxDate->dayOfWeek >= \Carbon\Carbon::THURSDAY) {
-        $lastWednesdayFromMaxDate = $maxDate->copy()->subDays($maxDate->dayOfWeek - \Carbon\Carbon::WEDNESDAY);
-    } else {
-        $lastWednesdayFromMaxDate = $maxDate->copy()->subDays(7);
-        $lastWednesdayFromMaxDate = $lastWednesdayFromMaxDate->addDays(\Carbon\Carbon::WEDNESDAY - $lastWednesdayFromMaxDate->dayOfWeek);
-    }
-
-    $previous3Wednesdays = [
-        $lastWednesdayFromMaxDate,
-        $lastWednesdayFromMaxDate->copy()->subDays(7),
-        $lastWednesdayFromMaxDate->copy()->subDays(14),
-        $lastWednesdayFromMaxDate->copy()->subDays(21),
-    ];
-
-    $logger->info('Dates not to delete :' . $maxDate->toDateString() . ',' . implode(',', $previous3Wednesdays));
-
-    /**
-     * Filtering out the latest and last weeks wednesday snapshots from the list
-     */
-    $toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate, $lastWednesdayFromMaxDate, $previous3Wednesdays) {
         /**
-         * @var \Carbon\Carbon $startTime
+         * Fetching all the snapshots for the given volume
          */
-        $startTime = $snapshot['StartTime'];
-        $startTime->setTime(0, 0, 0);
+        $result = $aws->describeSnapshots([
+            'Filters' => [
+                [
+                    'Name' => 'status',
+                    'Values' => ['completed']
+                ], [
+                    'Name' => 'volume-id',
+                    'Values' => [$volumeId]
+                ]
+            ]
+        ]);
 
-        if ($startTime->eq($maxDate)) {
-            return false;
+        /**
+         * Converting the StartTime of all snapshots to Carbon DateTime instances
+         */
+        $snapshots = collect($result->get('Snapshots'))->transform(function ($snapshot) {
+            $snapshot['StartTime'] = \Carbon\Carbon::parse($snapshot['StartTime']);
+            return $snapshot;
+        });
+
+        if($snapshots->isEmpty()){
+            continue;
         }
 
-        foreach ($previous3Wednesdays as $previous3Wednesday) {
-            if ($startTime->eq($previous3Wednesday)) {
+        /**
+         * The timestamp of newest snapshot created
+         *
+         * @var \Carbon\Carbon $maxDate
+         */
+        $maxDate = $snapshots->max('StartTime');
+        $maxDate->setTime(0, 0, 0);
+
+        /**
+         * Filtering out the latest and last weeks wednesday snapshots from the list
+         */
+        $toDeleteSnapshots = $snapshots->filter(function ($snapshot) use ($maxDate) {
+            /**
+             * @var \Carbon\Carbon $startTime
+             */
+            $startTime = $snapshot['StartTime'];
+            $startTime->setTime(0, 0, 0);
+
+            if ($startTime->eq($maxDate)) {
                 return false;
             }
-        }
-        return true;
-    });
+            return true;
+        });
 
-    $logger->info('Dates to delete are: ' . $toDeleteSnapshots->pluck('StartTime')->transform(function ($item) {
-            return $item->toDateString();
-        })->implode(','));
+        $logger->info('Dates to delete are: ' . $toDeleteSnapshots->pluck('StartTime')->transform(function ($item) {
+                return $item->toDateString();
+            })->implode(','));
 
 
-    /**
-     * Deleting the snapshots one by one
-     *
-     */
-    $toDeleteSnapshots->each(function ($snapshot) use ($aws, $logger) {
+        /**
+         * Deleting the snapshots one by one
+         *
+         */
+        $toDeleteSnapshots->each(function ($snapshot) use ($aws, $logger) {
         $aws->deleteSnapshot([
             'DryRun' => getenv('DRY_RUN') == true ? true : false,
             'SnapshotId' => $snapshot['SnapshotId']
         ]);
-        $logger->info('Deleting Snapshot:' . $snapshot['SnapshotId']);
-    });
+            $logger->info('Deleting Snapshot:' . $snapshot['SnapshotId']);
+        });
 
-    $logger->info('End Logging for Date ' . $today->toDateString());
+        $logger->info('End Logging for volume ' . $volumeId);
 
-} catch (\Exception $e) {
+    } catch (\Exception $e) {
 
-    $logger->error('Error encountered during execution');
-    $logger->error($e);
+        $logger->error('Error encountered during execution');
+        $logger->error($e);
+    }
 }
+
+$logger->info('End Logging for date ' . $today->toDateString());
+
 
 
 
